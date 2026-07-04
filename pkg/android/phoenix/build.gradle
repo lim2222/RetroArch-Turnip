@@ -1,18 +1,18 @@
 buildscript {
   repositories {
     google()
-    jcenter()
+    mavenCentral()
   }
 
   dependencies {
-    classpath 'com.android.tools.build:gradle:4.2.0'
+    classpath 'com.android.tools.build:gradle:8.2.2'
   }
 }
 
 allprojects {
     repositories {
         google()
-        jcenter()
+        mavenCentral()
     }
 
     Properties props = new Properties()
@@ -25,20 +25,29 @@ allprojects {
 apply plugin: 'com.android.application'
 
 android {
-  compileSdkVersion 31
-  buildToolsVersion "30.0.3"
-  ndkVersion "22.0.7026061"
-
+  namespace "com.retroarch"
+  compileSdkVersion 35
+  buildToolsVersion "35.0.0"
+  ndkVersion "26.2.11394342"
+  buildFeatures {
+    buildConfig true
+  }
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
   flavorDimensions "variant"
 
   defaultConfig {
+    applicationId "com.retroarch"
     minSdkVersion 16
     externalNativeBuild {
       ndkBuild {
         arguments "-j${Runtime.runtime.availableProcessors()}"
       }
     }
-    targetSdkVersion 28
+    targetSdkVersion 33
     versionCode System.currentTimeSeconds().toInteger()
     versionName "${getManifestAttribute("versionName")}_GIT"
   }
@@ -68,6 +77,17 @@ android {
       dimension "variant"
       ndk {
         abiFilters 'armeabi-v7a', 'x86'
+      }
+    }
+    turnip {
+      applicationId "com.retroarch.turnip"
+      resValue "string", "app_name", "RetroArch (Turnip)"
+      buildConfigField "boolean", "PLAY_STORE_BUILD", "false"
+
+      dimension "variant"
+      minSdkVersion 26
+      ndk {
+        abiFilters 'arm64-v8a'
       }
     }
     playStoreNormal {
@@ -113,6 +133,10 @@ android {
     }
     ra32 {
       java.srcDirs += ['../play-core-stub']
+    }
+    turnip {
+      java.srcDirs += ['../play-core-stub']
+      res.srcDirs = ['res', 'res64']
     }
     playStoreNormal {
       java.srcDirs += ['../play-core-impl']

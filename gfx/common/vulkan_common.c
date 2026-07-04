@@ -20,9 +20,24 @@
 #include <string/stdstring.h>
 #include <retro_timers.h>
 #include <retro_math.h>
+#include <dlfcn.h>
+
 
 #ifdef HAVE_CONFIG_H
 #include "../../config.h"
+#endif
+
+#if defined(ANDROID) && defined(HAVE_ADRENOTOOLS)
+#include <dlfcn.h>
+typedef void* (*adrenotools_open_libvulkan_t)(int, int, const char*,
+                                              const char*, const char*, const char*, const char*, void**);
+#define ADRENOTOOLS_DRIVER_CUSTOM 1
+extern char android_vulkan_driver_dir[4096];
+extern char android_vulkan_hook_lib_dir[4096];
+extern char android_vulkan_adrenotools_path[4096];
+extern bool android_vulkan_driver_enabled;
+extern void *android_vulkan_library_handle;
+extern bool  android_vulkan_library_managed;
 #endif
 
 #ifdef HAVE_X11
@@ -2608,6 +2623,7 @@ bool vulkan_context_init(gfx_ctx_vulkan_data_t *vk,
       enum vulkan_wsi_type type)
 {
    VkApplicationInfo app;
+   RARCH_LOG("[Vulkan/Android] vulkan_context_init called, type=%d\n", type);
    PFN_vkGetInstanceProcAddr GetInstanceProcAddr;
    const char *prog_name          = NULL;
    video_driver_state_t *video_st = video_state_get_ptr();
@@ -2648,12 +2664,22 @@ bool vulkan_context_init(gfx_ctx_vulkan_data_t *vk,
       if (!vulkan_library)
          vulkan_library = dylib_load("MoltenVK-v1.2.7.framework");
 #else
-      vulkan_library = dylib_load("libvulkan.so.1");
+    #if defined(ANDROID) && defined(HAVE_ADRENOTOOLS)
+      if (android_vulkan_library_handle)
+      {
+         vulkan_library = (dylib_t)android_vulkan_library_handle;
+         RARCH_LOG("[Vulkan] Using adrenotools-managed libvulkan handle: %p\n",
+                   android_vulkan_library_handle);
+      }
+    #endif
       if (!vulkan_library)
-         vulkan_library = dylib_load("libvulkan.so");
+      {
+         vulkan_library = dylib_load("libvulkan.so.1");
+         if (!vulkan_library)
+            vulkan_library = dylib_load("libvulkan.so");
+      }
 #endif
    }
-
    if (!vulkan_library)
    {
       RARCH_ERR("[Vulkan] Failed to open Vulkan loader.\n");
@@ -2665,9 +2691,19 @@ bool vulkan_context_init(gfx_ctx_vulkan_data_t *vk,
    GetInstanceProcAddr =
       (PFN_vkGetInstanceProcAddr)dylib_proc(vulkan_library, "vkGetInstanceProcAddr");
 
+   RARCH_LOG("[Vulkan] vkGetInstanceProcAddr = %p (lib=%p managed=%d)\n",
+             (void*)GetInstanceProcAddr, (void*)vulkan_library,
+    #if defined(ANDROID) && defined(HAVE_ADRENOTOOLS)
+             android_vulkan_library_managed ? 1 : 0
+    #else
+             0
+    #endif
+            );
+
    if (!GetInstanceProcAddr)
    {
-      RARCH_ERR("[Vulkan] Failed to load vkGetInstanceProcAddr symbol, broken loader?\n");
+      RARCH_ERR("[Vulkan] Failed to load vkGetInstanceProcAddr symbol, broken loader? dlerror=%s\n",
+                dlerror());
       return false;
    }
 
@@ -2864,8 +2900,19 @@ void vulkan_context_destroy(gfx_ctx_vulkan_data_t *vk,
 
          if (vulkan_library)
          {
+#if defined(ANDROID) && defined(HAVE_ADRENOTOOLS)
+            /* adrenotools 的 handle 由它自己管理生命周期,
+             * 外部 dlclose 会破坏 hook 状态导致后续崩溃 */
+            if (!android_vulkan_library_managed)
+            {
+               dylib_close(vulkan_library);
+               vulkan_library = NULL;
+            }
+            /* managed handle 保留, 不 close */
+#else
             dylib_close(vulkan_library);
             vulkan_library = NULL;
+#endif
          }
       }
    }

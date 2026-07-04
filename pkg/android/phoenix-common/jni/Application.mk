@@ -40,3 +40,8 @@ ifeq ($(USE_CLANG),1)
 endif
 
 APP_STL := c++_static
+
+# libadrenotools requires API 26+ on arm64-v8a
+ifeq ($(filter arm64-v8a,$(APP_ABI)),arm64-v8a)
+   APP_PLATFORM := android-26
+endif

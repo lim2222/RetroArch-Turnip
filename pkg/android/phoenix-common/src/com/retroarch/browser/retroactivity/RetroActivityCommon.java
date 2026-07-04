@@ -73,6 +73,8 @@ public class RetroActivityCommon extends NativeActivity
     System.loadLibrary("retroarch-activity");
   }
 
+  private native void nativeSetVulkanDriverDir(String driverDir, String hookLibDir,
+                                              String tmpDir, String fileRedirectDir);
   public static final int FRONTEND_POWERSTATE_NONE = 0;
   public static final int FRONTEND_POWERSTATE_NO_SOURCE = 1;
   public static final int FRONTEND_POWERSTATE_CHARGING = 2;
@@ -136,17 +138,39 @@ public class RetroActivityCommon extends NativeActivity
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
-    cleanupSymlinks();
-    updateSymlinks();
-
-    registerReceiver(mUsbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION));
-    ((InputManager) getSystemService(Context.INPUT_SERVICE))
-            .registerInputDeviceListener(this, null);
-    PlayCoreManager.getInstance().onCreate(this);
-    super.onCreate(savedInstanceState);
+      initCustomVulkanDriver();
+      cleanupSymlinks();
+      updateSymlinks();
+      registerReceiver(mUsbPermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION));
+      ((InputManager) getSystemService(Context.INPUT_SERVICE))
+              .registerInputDeviceListener(this, null);
+      PlayCoreManager.getInstance().onCreate(this);
+      super.onCreate(savedInstanceState);
   }
 
-  @Override
+    @android.annotation.TargetApi(26)
+private void initCustomVulkanDriver() {
+    if (!VulkanDriverManager.isArm64()) return;
+
+    String systemDir = "/sdcard/RetroArch/system";
+    java.util.List<java.io.File> zips = VulkanDriverManager.listZips(systemDir);
+    if (zips.isEmpty()) return;
+
+    String zip = zips.get(0).getAbsolutePath();
+    android.util.Log.i("RetroArch/VulkanDriver", "Testing with: " + zip);
+
+    String dir = VulkanDriverManager.extractDriver(this, zip);
+    if (dir == null) return;
+
+    String hookDir = getApplicationInfo().nativeLibraryDir;
+    // tmpDir: 用 codeCacheDir, adrenotools 需要可写目录做 soname patch
+    String tmpDir = getCodeCacheDir().getAbsolutePath();
+    // fileRedirectDir: 用 codeCacheDir 下的子目录, turnip 会把只读文件重定向到这里
+    String fileRedirectDir = new File(getCodeCacheDir(), "file_redirect").getAbsolutePath();
+    new File(fileRedirectDir).mkdirs();
+
+    nativeSetVulkanDriverDir(dir, hookDir, tmpDir, fileRedirectDir);
+}
   protected void onDestroy() {
     ((InputManager) getSystemService(Context.INPUT_SERVICE))
             .unregisterInputDeviceListener(this);

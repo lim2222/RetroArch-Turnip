@@ -253,4 +253,62 @@ ifneq ($(SANITIZER),)
    LOCAL_LDFLAGS  += -fsanitize=$(SANITIZER)
 endif
 
+ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
+ifeq ($(HAVE_VULKAN),1)
+LOCAL_CFLAGS           += -DHAVE_ADRENOTOOLS
+LOCAL_CPPFLAGS         += -std=c++17
+LOCAL_C_INCLUDES       += $(LOCAL_PATH)/$(DEPS_DIR)/libadrenotools/include \
+                          $(LOCAL_PATH)/$(DEPS_DIR)/libadrenotools/lib/linkernsbypass
+LOCAL_SRC_FILES        += android_vulkan_driver.c \
+                          $(DEPS_DIR)/libadrenotools/src/driver.cpp \
+                          $(DEPS_DIR)/libadrenotools/lib/linkernsbypass/android_linker_ns.cpp \
+                          $(DEPS_DIR)/libadrenotools/lib/linkernsbypass/elf_soname_patcher.cpp
+LOCAL_LDLIBS           += -ldl -llog -landroid
+endif
+endif
 include $(BUILD_SHARED_LIBRARY)
+
+ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
+ifeq ($(HAVE_VULKAN),1)
+
+# hook_impl
+include $(CLEAR_VARS)
+LOCAL_MODULE            := hook_impl
+LOCAL_CPPFLAGS          := -std=c++17 -fno-exceptions -fno-rtti -fvisibility=hidden
+LOCAL_C_INCLUDES        := $(LOCAL_PATH)/$(DEPS_DIR)/libadrenotools/include \
+                           $(LOCAL_PATH)/$(DEPS_DIR)/libadrenotools/src/hook \
+                           $(LOCAL_PATH)/$(DEPS_DIR)/libadrenotools/lib/linkernsbypass
+LOCAL_SRC_FILES         := $(DEPS_DIR)/libadrenotools/src/hook/hook_impl.cpp \
+                           $(DEPS_DIR)/libadrenotools/lib/linkernsbypass/android_linker_ns.cpp \
+                           $(DEPS_DIR)/libadrenotools/lib/linkernsbypass/elf_soname_patcher.cpp
+LOCAL_LDLIBS            := -llog -ldl -landroid
+include $(BUILD_SHARED_LIBRARY)
+
+# main_hook
+include $(CLEAR_VARS)
+LOCAL_MODULE     := main_hook
+LOCAL_CFLAGS     := -fvisibility=hidden
+LOCAL_LDFLAGS    := -Wl,-z,global
+LOCAL_SRC_FILES  := $(DEPS_DIR)/libadrenotools/src/hook/main_hook.c
+LOCAL_SHARED_LIBRARIES := hook_impl
+include $(BUILD_SHARED_LIBRARY)
+
+# file_redirect_hook
+include $(CLEAR_VARS)
+LOCAL_MODULE     := file_redirect_hook
+LOCAL_CFLAGS     := -fvisibility=hidden
+LOCAL_LDFLAGS    := -Wl,-z,global
+LOCAL_SRC_FILES  := $(DEPS_DIR)/libadrenotools/src/hook/file_redirect_hook.c
+LOCAL_SHARED_LIBRARIES := hook_impl
+include $(BUILD_SHARED_LIBRARY)
+
+# gsl_alloc_hook
+include $(CLEAR_VARS)
+LOCAL_MODULE     := gsl_alloc_hook
+LOCAL_CFLAGS     := -fvisibility=hidden
+LOCAL_LDFLAGS    := -Wl,-z,global
+LOCAL_SRC_FILES  := $(DEPS_DIR)/libadrenotools/src/hook/gsl_alloc_hook.c
+LOCAL_SHARED_LIBRARIES := hook_impl
+include $(BUILD_SHARED_LIBRARY)
+endif
+endif

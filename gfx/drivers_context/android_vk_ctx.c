@@ -65,6 +65,7 @@ static void android_gfx_ctx_vk_destroy(void *data)
 static void *android_gfx_ctx_vk_init(void *video_driver)
 {
    struct android_app *android_app = (struct android_app*)g_android;
+   RARCH_LOG("[Vulkan/Android] android_gfx_ctx_vk_init called\n");
    android_ctx_data_vk_t *and  = (android_ctx_data_vk_t*)calloc(1, sizeof(*and));
 
    if (!android_app || !and)
