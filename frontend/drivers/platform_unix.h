@@ -207,6 +207,10 @@ struct android_app
    jmethodID getPersistedSafTrees;
    bool have_saf;
 #endif
+#ifdef HAVE_ADRENOTOOLS
+   jmethodID requestVulkanDriverPicker;
+   jmethodID resetVulkanDriverToSystem;
+#endif
 };
 
 enum
@@ -385,21 +389,21 @@ enum
    JNI_EXCEPTION(env)
 
 extern JNIEnv *jni_thread_getenv(void);
-
 void android_app_write_cmd(struct android_app *android_app, int8_t cmd);
-
 extern struct android_app *g_android;
-
 void frontend_android_get_name(char *s, size_t len);
-
 void frontend_android_get_version_sdk(int32_t *sdk);
-
+#ifdef HAVE_ADRENOTOOLS
+extern char android_vulkan_driver_display_name[256];
+extern bool android_vulkan_driver_enabled;
+#endif
 bool is_screen_reader_enabled(void);
-
 #ifdef HAVE_SAF
 void android_show_saf_tree_picker(void);
 #endif
-
+#ifdef HAVE_ADRENOTOOLS
+void android_show_vulkan_driver_picker(void);
+void android_reset_vulkan_driver(void);
 #endif
-
+#endif /* ANDROID */
 #endif

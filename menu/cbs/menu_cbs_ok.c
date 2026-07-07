@@ -6887,6 +6887,22 @@ static int action_ok_open_picker(const char *path,
    return ret;
 #endif
 }
+static int action_ok_vulkan_driver_picker(const char *path,
+   const char *label, unsigned type, size_t idx, size_t entry_idx)
+{
+#if defined(ANDROID) && defined(HAVE_ADRENOTOOLS)
+   android_show_vulkan_driver_picker();
+#endif
+   return 0;
+}
+static int action_ok_vulkan_driver_reset(const char *path,
+   const char *label, unsigned type, size_t idx, size_t entry_idx)
+{
+#if defined(ANDROID) && defined(HAVE_ADRENOTOOLS)
+   android_reset_vulkan_driver();
+#endif
+   return 0;
+}
 
 #ifdef HAVE_NETWORKING
 #ifdef HAVE_WIFI
@@ -9573,6 +9589,8 @@ static int menu_cbs_init_bind_ok_compare_label(menu_file_list_cbs_t *cbs,
          {MENU_ENUM_LABEL_MENU_FILE_BROWSER_SETTINGS,          action_ok_menu_file_browser_list},
          {MENU_ENUM_LABEL_FILE_BROWSER_OPEN_UWP_PERMISSIONS,   action_ok_open_uwp_permission_settings},
          {MENU_ENUM_LABEL_FILE_BROWSER_OPEN_PICKER,            action_ok_open_picker},
+         {MENU_ENUM_LABEL_VULKAN_DRIVER_PICKER,                action_ok_vulkan_driver_picker},
+         {MENU_ENUM_LABEL_VULKAN_DRIVER_RESET,                 action_ok_vulkan_driver_reset},
          {MENU_ENUM_LABEL_RETRO_ACHIEVEMENTS_SETTINGS,         action_ok_retro_achievements_list},
          {MENU_ENUM_LABEL_CHEEVOS_APPEARANCE_SETTINGS,         action_ok_cheevos_appearance_list},
          {MENU_ENUM_LABEL_CHEEVOS_VISIBILITY_SETTINGS,         action_ok_cheevos_visibility_list},

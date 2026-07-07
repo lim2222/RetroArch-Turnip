@@ -67,6 +67,7 @@
 #endif
 
 extern struct key_desc key_descriptors[RARCH_MAX_KEYS];
+extern size_t setting_get_string_representation_default(rarch_setting_t *setting, char *s, size_t len);
 
 #ifdef HAVE_AUDIOMIXER
 static size_t menu_action_setting_audio_mixer_stream_name(
@@ -2342,18 +2343,26 @@ static int menu_cbs_init_bind_get_string_representation_compare_type(
                menu_action_setting_disp_set_label_cheat_match);
 #endif
          break;
-      case MENU_SETTING_SUBGROUP:
-      case MENU_SETTING_ACTION:
-      case MENU_SETTING_ACTION_REMAP_FILE_MANAGER_LIST:
-      case MENU_SETTING_ACTION_REMAP_FILE_LOAD:
-      case MENU_SETTING_ACTION_CORE_DISK_OPTIONS:
-      case MENU_SETTINGS_CORE_DISK_OPTIONS_DISK_IMAGE_APPEND:
-      case MENU_EXPLORE_TAB:
-      case MENU_CONTENTLESS_CORES_TAB:
-      case MENU_PLAYLISTS_TAB:
-         BIND_ACTION_GET_VALUE(cbs,
-               menu_action_setting_disp_set_label_menu_more);
-         break;
+       case MENU_SETTING_SUBGROUP:
+       case MENU_SETTING_ACTION_REMAP_FILE_MANAGER_LIST:
+       case MENU_SETTING_ACTION_REMAP_FILE_LOAD:
+       case MENU_SETTING_ACTION_CORE_DISK_OPTIONS:
+       case MENU_SETTINGS_CORE_DISK_OPTIONS_DISK_IMAGE_APPEND:
+       case MENU_EXPLORE_TAB:
+       case MENU_CONTENTLESS_CORES_TAB:
+       case MENU_PLAYLISTS_TAB:
+           BIND_ACTION_GET_VALUE(cbs,
+                                 menu_action_setting_disp_set_label_menu_more);
+           break;
+       case MENU_SETTING_ACTION:
+           if (cbs->setting
+               && cbs->setting->get_string_representation
+               && cbs->setting->get_string_representation != &setting_get_string_representation_default)
+               BIND_ACTION_GET_VALUE(cbs, menu_action_setting_disp_set_label);
+           else
+               BIND_ACTION_GET_VALUE(cbs,
+                                     menu_action_setting_disp_set_label_menu_more);
+           break;
       case MENU_SETTINGS_CORE_DISK_OPTIONS_DISK_INDEX:
          BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_disk_index);

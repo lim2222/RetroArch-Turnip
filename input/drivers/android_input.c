@@ -2346,17 +2346,17 @@ static void android_input_grab_mouse(void *data, bool state)
       CALL_VOID_METHOD_PARAM(env, g_android->activity->clazz,
             g_android->inputGrabMouse, state);
 }
-
 static void android_input_keypress_vibrate()
 {
    static const int keyboard_press = 3;
+   settings_t *settings = config_get_ptr();
+   unsigned rumble_gain = settings ? settings->uints.input_rumble_gain : 100;
+   int amplitude        = (int)((255.0f / 100.0f) * (float)rumble_gain);
    JNIEnv *env = (JNIEnv*)jni_thread_getenv();
-
    if (!env)
       return;
-
    CALL_VOID_METHOD_PARAM(env, g_android->activity->clazz,
-         g_android->doHapticFeedback, (jint)keyboard_press);
+         g_android->doHapticFeedback, (jint)keyboard_press, (jint)amplitude);
 }
 
 input_driver_t input_android = {

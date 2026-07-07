@@ -33168,6 +33168,22 @@ MSG_HASH(
    "Open another directory using the system file picker"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_VULKAN_DRIVER_PICKER,
+   "Custom Vulkan Driver (Turnip)"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_VULKAN_DRIVER_PICKER,
+   "Select a custom Vulkan/Turnip driver ZIP file. Requires restart to take effect."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_VULKAN_DRIVER_RESET,
+   "Reset to System Vulkan Driver"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_VULKAN_DRIVER_RESET,
+   "Remove custom Vulkan driver and use the system default. Requires restart to take effect."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_VIDEO_FILTER_FLICKER,
    "Flicker filter"
    )

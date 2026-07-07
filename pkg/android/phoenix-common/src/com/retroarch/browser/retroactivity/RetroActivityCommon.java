@@ -74,7 +74,8 @@ public class RetroActivityCommon extends NativeActivity
   }
 
   private native void nativeSetVulkanDriverDir(String driverDir, String hookLibDir,
-                                              String tmpDir, String fileRedirectDir);
+                                              String tmpDir, String fileRedirectDir,
+                                              String driverLibName, String driverDisplayName);
   public static final int FRONTEND_POWERSTATE_NONE = 0;
   public static final int FRONTEND_POWERSTATE_NO_SOURCE = 1;
   public static final int FRONTEND_POWERSTATE_CHARGING = 2;
@@ -87,6 +88,7 @@ public class RetroActivityCommon extends NativeActivity
   public static final int RETRO_RUMBLE_STRONG = 0;
   public static final int RETRO_RUMBLE_WEAK = 1;
   public static final int REQUEST_CODE_OPEN_DOCUMENT_TREE = 0;
+  public static final int REQUEST_CODE_VULKAN_DRIVER_ZIP = 1;
   public boolean sustainedPerformanceMode = true;
   public int screenOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
 
@@ -152,24 +154,65 @@ public class RetroActivityCommon extends NativeActivity
 private void initCustomVulkanDriver() {
     if (!VulkanDriverManager.isArm64()) return;
 
-    String systemDir = "/sdcard/RetroArch/system";
-    java.util.List<java.io.File> zips = VulkanDriverManager.listZips(systemDir);
-    if (zips.isEmpty()) return;
+    SharedPreferences prefs = getSharedPreferences("retroarch_vulkan", Context.MODE_PRIVATE);
+    String zipUri = prefs.getString("driver_zip_uri", null);
+    boolean userResetToSystem = prefs.getBoolean("user_reset_to_system", false);
 
-    String zip = zips.get(0).getAbsolutePath();
-    android.util.Log.i("RetroArch/VulkanDriver", "Testing with: " + zip);
+    String dir = null;
+    String driverLibName = null;
+    String driverDisplayName = null;
 
-    String dir = VulkanDriverManager.extractDriver(this, zip);
-    if (dir == null) return;
+    if (zipUri != null && !zipUri.isEmpty()) {
+        android.util.Log.i("RetroArch/VulkanDriver", "Using driver from URI: " + zipUri);
+        String lastExtractedUri = prefs.getString("last_extracted_uri", null);
+        if (!zipUri.equals(lastExtractedUri)) {
+            android.util.Log.i("RetroArch/VulkanDriver", "Driver URI changed, invalidating cache");
+            VulkanDriverManager.clearCache(this);
+        }
+        dir = VulkanDriverManager.getCachedDir(this);
+        driverLibName = VulkanDriverManager.getCachedLibraryName(this);
+        driverDisplayName = VulkanDriverManager.getCachedDisplayName(this);
+        if (dir == null || driverLibName == null) {
+            Uri uri = Uri.parse(zipUri);
+            VulkanDriverManager.ExtractResult result = VulkanDriverManager.extractDriverFromUri(this, uri);
+            if (result != null) {
+                dir = result.driverDir;
+                driverLibName = result.libraryName;
+                driverDisplayName = result.displayName;
+                prefs.edit().putString("last_extracted_uri", zipUri).apply();
+            }
+        }
+    }
+
+    if ((dir == null || driverLibName == null) && !userResetToSystem) {
+        String systemDir = "/sdcard/RetroArch/system";
+        java.util.List<java.io.File> zips = VulkanDriverManager.listZips(systemDir);
+        if (!zips.isEmpty()) {
+            String zipPath = zips.get(0).getAbsolutePath();
+            android.util.Log.i("RetroArch/VulkanDriver", "Fallback scanning fixed dir, using: " + zipPath);
+            dir = VulkanDriverManager.extractDriver(this, zipPath);
+            driverLibName = VulkanDriverManager.getCachedLibraryName(this);
+            driverDisplayName = VulkanDriverManager.getCachedDisplayName(this);
+            if (driverLibName == null)
+                driverLibName = "libvulkan_freedreno.so";
+            if (driverDisplayName == null)
+                driverDisplayName = driverLibName;
+        }
+    }
+
+    if (dir == null || driverLibName == null) {
+        android.util.Log.i("RetroArch/VulkanDriver", "No custom driver found, using system driver.");
+        return;
+    }
+    if (driverDisplayName == null)
+        driverDisplayName = driverLibName;
 
     String hookDir = getApplicationInfo().nativeLibraryDir;
-    // tmpDir: 用 codeCacheDir, adrenotools 需要可写目录做 soname patch
     String tmpDir = getCodeCacheDir().getAbsolutePath();
-    // fileRedirectDir: 用 codeCacheDir 下的子目录, turnip 会把只读文件重定向到这里
     String fileRedirectDir = new File(getCodeCacheDir(), "file_redirect").getAbsolutePath();
     new File(fileRedirectDir).mkdirs();
 
-    nativeSetVulkanDriverDir(dir, hookDir, tmpDir, fileRedirectDir);
+    nativeSetVulkanDriverDir(dir, hookDir, tmpDir, fileRedirectDir, driverLibName, driverDisplayName);
 }
   protected void onDestroy() {
     ((InputManager) getSystemService(Context.INPUT_SERVICE))
@@ -183,6 +226,8 @@ private void initCustomVulkanDriver() {
   @Override
   public void onActivityResult(int requestCode, int resultCode, Intent intent)
   {
+    android.util.Log.i("RetroArch/VulkanDriver", "onActivityResult: requestCode=" + requestCode
+          + " resultCode=" + resultCode + " intent=" + intent);
     if (intent == null)
       return;
 
@@ -199,6 +244,30 @@ private void initCustomVulkanDriver() {
         }
         break;
 
+      case REQUEST_CODE_VULKAN_DRIVER_ZIP:
+        {
+          if (resultCode != RESULT_OK)
+            break;
+          Uri uri = intent.getData();
+          if (uri == null)
+            break;
+          if (Build.VERSION.SDK_INT >= 19)
+            getContentResolver().takePersistableUriPermission(uri,
+                  intent.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION));
+
+          SharedPreferences prefs = getSharedPreferences("retroarch_vulkan", Context.MODE_PRIVATE);
+          prefs.edit().putString("driver_zip_uri", uri.toString()).apply();
+
+          runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+              android.widget.Toast.makeText(RetroActivityCommon.this,
+                    "Turnip driver selected. Restart RetroArch to apply.",
+                    android.widget.Toast.LENGTH_LONG).show();
+            }
+          });
+        }
+        break;
       default:
         break;
     }
@@ -207,6 +276,43 @@ private void initCustomVulkanDriver() {
   public void requestOpenDocumentTree()
   {
     startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), REQUEST_CODE_OPEN_DOCUMENT_TREE);
+  }
+  public void requestVulkanDriverPicker()
+  {
+    runOnUiThread(new Runnable() {
+      @Override
+      public void run() {
+        Intent intent = new Intent(RetroActivityCommon.this, VulkanDriverPickerActivity.class);
+        startActivity(intent);
+      }
+    });
+  }
+  public void resetVulkanDriverToSystem()
+  {
+    final SharedPreferences prefs = getSharedPreferences("retroarch_vulkan", Context.MODE_PRIVATE);
+    prefs.edit().remove("driver_zip_uri").putBoolean("user_reset_to_system", true).commit();
+    runOnUiThread(new Runnable() {
+      @Override
+      public void run() {
+        android.widget.Toast.makeText(RetroActivityCommon.this,
+              "Reset to system Vulkan driver. Restarting RetroArch...",
+              android.widget.Toast.LENGTH_SHORT).show();
+        restartAppForVulkanChange();
+      }
+    });
+  }
+
+  private void restartAppForVulkanChange()
+  {
+    Intent intent = getPackageManager().getLaunchIntentForPackage(getPackageName());
+    if (intent == null) {
+      finish();
+      return;
+    }
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+    startActivity(intent);
+    finish();
+    Runtime.getRuntime().exit(0);
   }
 
   public void doVibrate(int id, int effect, int strength, int oneShot)
@@ -624,8 +730,27 @@ private void initCustomVulkanDriver() {
     return result == report.length;
   }
 
-  public void doHapticFeedback(int effect)
+  public void doHapticFeedback(int effect, int amplitude)
   {
+    /* Direct short high-amplitude pulse for overlay button presses,
+     * bypassing the system's generic performHapticFeedback (which
+     * tends to feel weak/vague on many devices). Fixed 20ms duration,
+     * amplitude driven by the existing Vibration Strength setting so
+     * overlay button haptics scale together with regular rumble. */
+    if (Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && amplitude > 0) {
+      Vibrator vibrator = (Vibrator)getSystemService(Context.VIBRATOR_SERVICE);
+      if (vibrator != null && vibrator.hasVibrator()) {
+        int clampedAmplitude = Math.min(255, Math.max(1, amplitude));
+        vibrator.vibrate(
+              VibrationEffect.createOneShot(80, clampedAmplitude),
+              new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_GAME)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build());
+        Log.i("RetroActivity", "Haptic Feedback (direct pulse) effect " + effect + " amplitude " + clampedAmplitude);
+        return;
+      }
+    }
     getWindow().getDecorView().performHapticFeedback(effect,
         HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING | HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
     Log.i("RetroActivity", "Haptic Feedback effect " + effect);

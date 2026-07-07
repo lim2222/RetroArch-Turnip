@@ -7372,6 +7372,16 @@ static size_t setting_get_string_representation_input_touch_scale(
 }
 
 #ifdef ANDROID
+#ifdef HAVE_ADRENOTOOLS
+static size_t setting_get_string_representation_vulkan_driver_name(
+        rarch_setting_t *setting, char *s, size_t len)
+{
+   (void)setting;
+   if (android_vulkan_driver_enabled && android_vulkan_driver_display_name[0] != '\0')
+      return strlcpy(s, android_vulkan_driver_display_name, len);
+   return strlcpy(s, "System Driver", len);
+}
+#endif
 static size_t setting_get_string_representation_android_physical_keyboard(
         rarch_setting_t *setting, char *s, size_t len)
 {
@@ -14543,25 +14553,38 @@ static void settings_build_video(
                   &group_info, &subgroup_info, parent_group);
          }
 #endif
-
+#if defined(ANDROID) && defined(HAVE_ADRENOTOOLS)
+            CONFIG_ACTION(
+                  list, list_info,
+                  MENU_ENUM_LABEL_VULKAN_DRIVER_PICKER,
+                  MENU_ENUM_LABEL_VALUE_VULKAN_DRIVER_PICKER,
+                  &group_info,
+                  &subgroup_info,
+                  parent_group);
+            (*list)[list_info->index - 1].get_string_representation =
+               &setting_get_string_representation_vulkan_driver_name;
+            CONFIG_ACTION(
+                  list, list_info,
+                  MENU_ENUM_LABEL_VULKAN_DRIVER_RESET,
+                  MENU_ENUM_LABEL_VALUE_VULKAN_DRIVER_RESET,
+                  &group_info,
+                  &subgroup_info,
+                  parent_group);
+#endif
          {
             settings_list_add_desc(list, list_info, settings,
                   rot_desc, ARRAY_SIZE(rot_desc),
                   &group_info, &subgroup_info, parent_group);
          }
-
          END_SUB_GROUP(list, list_info, parent_group);
-
          if ((video_driver_get_disp_flags() & VIDEO_FLAG_HDR_SUPPORT))
          {
             START_SUB_GROUP(list, list_info, "HDR", &group_info, &subgroup_info, parent_group);
-
       {
          settings_list_add_desc(list, list_info, settings,
                vid_desc_18, ARRAY_SIZE(vid_desc_18),
                &group_info, &subgroup_info, parent_group);
       }
-
             /* Descriptor holdout: poke tail outside the descriptor grammar. */
             CONFIG_UINT(
                   list, list_info,

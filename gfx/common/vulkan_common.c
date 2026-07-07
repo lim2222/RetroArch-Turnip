@@ -2901,14 +2901,14 @@ void vulkan_context_destroy(gfx_ctx_vulkan_data_t *vk,
          if (vulkan_library)
          {
 #if defined(ANDROID) && defined(HAVE_ADRENOTOOLS)
-            /* adrenotools 的 handle 由它自己管理生命周期,
-             * 外部 dlclose 会破坏 hook 状态导致后续崩溃 */
+            /* adrenotools manages its own handle lifecycle; 
+             * calling dlclose externally will break the hook state and cause subsequent crashes. */
             if (!android_vulkan_library_managed)
             {
                dylib_close(vulkan_library);
                vulkan_library = NULL;
             }
-            /* managed handle 保留, 不 close */
+            /* Keep the managed handle intact; do not close it. */
 #else
             dylib_close(vulkan_library);
             vulkan_library = NULL;

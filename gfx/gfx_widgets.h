@@ -33,7 +33,7 @@
 #include "gfx_animation.h"
 #include "gfx_display.h"
 
-#define DEFAULT_BACKDROP               0.75f
+#define DEFAULT_BACKDROP               0.0f
 
 #define MSG_QUEUE_PENDING_MAX          32
 #define MSG_QUEUE_ONSCREEN_MAX         4
